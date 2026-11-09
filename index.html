@@ -1,2 +1,8 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#173d35"><meta name="description" content="One bowl. Three rounds. A whole lot of nonsense. A pass-and-play party game."><title>Word Salad</title><link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script></head><body><header><a href="./" class="brand">◒ <span>word salad<span class="dot">.</span></span></a><button id="sound" class="quiet" aria-label="Toggle sound">Sound on</button></header><main id="app"></main><footer>MADE FOR YOUR TABLE · SAVED ON THIS DEVICE</footer><div id="notice" role="status"></div></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#173d35"><meta name="description" content="One bowl. Three rounds. A whole lot of nonsense. A pass-and-play party game."><title>Word Salad</title><script type="module">
+// Fresh asset URLs on every page load avoid stale scripts and styles on Pages.
+const version=Date.now().toString(36);
+const css=document.createElement('link');css.rel='stylesheet';css.href='./style.css?v='+version;
+document.head.append(css);
+import('./app.js?v='+version).catch(()=>{document.querySelector('#app').textContent='Unable to load Word Salad. Check your connection and refresh.'});
+</script></head><body><header><a href="./" class="brand">◒ <span>word salad<span class="dot">.</span></span></a><button id="sound" class="quiet" aria-label="Toggle sound">Sound on</button></header><main id="app"></main><footer>MADE FOR YOUR TABLE · SAVED ON THIS DEVICE</footer><div id="notice" role="status"></div></body></html>
