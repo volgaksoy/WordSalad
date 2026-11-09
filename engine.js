@@ -1,0 +1,8 @@
+export const rounds = [{name:'Talk it out',icon:'💬',rule:'Describe the phrase. No saying any of its words.'},{name:'Act it out',icon:'🙌',rule:'Mime only. No words, sounds, or mouthing.'},{name:'Just one word',icon:'☝️',rule:'Say one word only. Choose wisely.'}];
+export function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+export function startGame(teams,settings){return {version:1,screen:'handoff',teams:teams.map(t=>({...t,score:0,next:0})),settings,phrases:[],entry:0,round:0,team:0,queue:[],history:[],turn:[],remaining:settings.seconds*1000,sound:true}}
+export function beginPlay(s){s.queue=shuffle(s.phrases.map((_,i)=>i));s.screen='ready'}
+export function remaining(s,now=Date.now()){return s.deadline?Math.max(0,s.deadline-now):s.remaining}
+export function endTurn(s,now=Date.now()){s.remaining=remaining(s,now);delete s.deadline;s.screen='review';if(s.queue.length)s.turn.push({id:s.queue[0],status:'Unanswered',round:s.round,team:s.team});s.history.push(...s.turn);}
+export function answer(s,correct,now=Date.now()){if(s.screen!=='playing')return;if(remaining(s,now)<=0){endTurn(s,now);return}const id=s.queue.shift();s.turn.push({id,status:correct?'Guessed':'Skipped',round:s.round,team:s.team});if(correct)s.teams[s.team].score++;else s.queue.push(id);if(!s.queue.length){s.remaining=remaining(s,now);delete s.deadline;if(s.round===2){s.history.push(...s.turn);s.screen='finished'}else{s.round++;s.queue=shuffle(s.phrases.map((_,i)=>i));s.screen='transition'}}}
+export function nextTurn(s){s.teams[s.team].next++;s.team=1-s.team;s.turn=[];s.remaining=s.settings.seconds*1000;s.screen='ready'}
