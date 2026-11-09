@@ -4,8 +4,29 @@ try{state=JSON.parse(localStorage.getItem(key));if(state?.version!==1)state=null
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function notify(t){$('#notice').textContent=t;$('#notice').style.display='block';setTimeout(()=>$('#notice').style.display='none',5000)}
 function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{notify('Browser storage is unavailable or full. Keep this page open to preserve this game.')}}
-function tone(freq=600,duration=.15){if(state?.sound===false)return;try{ctx??=new(window.AudioContext||window.webkitAudioContext)();ctx.resume();const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=freq;g.gain.setValueAtTime(.12,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+duration);o.start();o.stop(ctx.currentTime+duration)}catch{}}
-function alarm(){tone(360,.6);setTimeout(()=>tone(260,.8),250);navigator.vibrate?.([150,80,250])}
+function tone(freq=600,duration=.15,{wave='sine',volume=.12,delay=0,sustain=0}={}){
+  if(state?.sound===false)return;
+  try{
+    ctx??=new(window.AudioContext||window.webkitAudioContext)();ctx.resume();
+    const o=ctx.createOscillator(),g=ctx.createGain(),start=ctx.currentTime+delay,end=start+duration;
+    o.connect(g);g.connect(ctx.destination);o.type=wave;o.frequency.value=freq;
+    g.gain.setValueAtTime(.001,start);
+    g.gain.exponentialRampToValueAtTime(volume,start+.012);
+    if(sustain)g.gain.setValueAtTime(volume,start+Math.min(sustain,duration-.03));
+    g.gain.exponentialRampToValueAtTime(.001,end);
+    o.onended=()=>{o.disconnect();g.disconnect()};o.start(start);o.stop(end);
+  }catch{}
+}
+function chime(){
+  // Bright bell fundamental plus a quieter octave, with time to ring out.
+  tone(1046.5,.55,{volume:.28});
+  tone(2093,.4,{volume:.09});
+}
+function alarm(){
+  // Three sustained, harmonically rich buzzes cut through table conversation.
+  for(let i=0;i<3;i++)tone(185,.38,{wave:'sawtooth',volume:.25,delay:i*.48,sustain:.30});
+  navigator.vibrate?.([380,100,380,100,380]);
+}
 function go(screen){state.screen=screen;save();render()}
 function players(){return state.teams.flatMap((t,team)=>t.players.map(name=>({name,team})))}
 function scores(){return `<div class="scores">${state.teams.map((t,i)=>`<div class="score ${i===state.team?'active':''}"><span>${esc(t.name)}</span><strong>${t.score}</strong></div>`).join('')}</div>`}
@@ -29,7 +50,7 @@ if(state.screen==='playing'){tick();interval=setInterval(tick,100)}
 function review(items,full=false){return `<ul class="review">${items.map(x=>`<li><span>${esc(state.phrases[x.id])}${full?`<br><small>Round ${x.round+1} · ${esc(state.teams[x.team].name)}</small>`:''}</span><small>${x.status==='Guessed'?'✓':x.status==='Skipped'?'↷':'◷'} ${x.status}</small></li>`).join('')}</ul>`}
 function setup(){clearInterval(interval);clearInterval(countdown);countdown=0;const draft=state?.screen==='setup'?state.setupDraft:null;state={version:1,screen:'setup',sound:state?.sound??true,setupDraft:draft};save();$('#app').innerHTML=`<section class="panel"><span class="eyebrow">A FEW FRESH INGREDIENTS</span><h2>Bring your people.</h2><p>Two teams, however you split them. Enter one player per line.</p><form id="setup" class="stack"><div class="grid">${[0,1].map(i=>`<div class="card"><label for="team${i}">Team ${i+1} name <span class="hint">(optional)</span></label><input id="team${i}" maxlength="60" placeholder="Use player names"><label for="players${i}" style="margin-top:20px">Players</label><textarea id="players${i}" required placeholder="${i?'Jamie\nSam':'Alex\nTaylor'}" maxlength="1000"></textarea></div>`).join('')}</div><div class="grid"><div><label for="count">Phrases per player</label><input type="number" id="count" min="1" max="12" value="4" required></div><div><label for="seconds">Seconds per turn</label><input type="number" id="seconds" min="10" max="300" value="60" required></div></div><button class="primary">Let’s fill the bowl →</button></form><p class="hint">Uneven teams welcome. For the best game, have at least two people on each team.</p></section>`;if(draft)Object.entries(draft).forEach(([id,value])=>$('#'+id).value=value);$('#setup').oninput=()=>{state.setupDraft=Object.fromEntries([...$('#setup').querySelectorAll('input,textarea')].map(el=>[el.id,el.value]));save()};$('#setup').onsubmit=e=>{e.preventDefault();const teams=[0,1].map(i=>{const players=$('#players'+i).value.split('\n').map(x=>x.trim()).filter(Boolean);return {players,name:$('#team'+i).value.trim()||players.join(' & ')}});if(teams.some(t=>!t.players.length)){notify('Add at least one player to each team.');return}state=startGame(teams,{count:Number($('#count').value),seconds:Number($('#seconds').value)});save();render()}}
 let lastSecond;
-function tick(){if(state.screen!=='playing')return;const ms=remaining(state),sec=Math.ceil(ms/1000),el=$('#timer');if(el){el.textContent=`${sec}s`;el.classList.toggle('urgent',sec<=10)}if(sec<=5&&sec>0&&sec!==lastSecond)tone(450,.08);lastSecond=sec;if(ms<=0){endTurn(state);save();alarm();render()}}
+function tick(){if(state.screen!=='playing')return;const ms=remaining(state),sec=Math.ceil(ms/1000),el=$('#timer');if(el){el.textContent=`${sec}s`;el.classList.toggle('urgent',sec<=10)}if(sec<=3&&sec>0&&sec!==lastSecond)chime();lastSecond=sec;if(ms<=0){endTurn(state);save();alarm();render()}}
 function startCountdown(){if(countdown)return;tone();let n=3;$('#start').disabled=true;$('#count').textContent=n;countdown=setInterval(()=>{n--;if(n>0){$('#count').textContent=n;tone(600,.12)}else{clearInterval(countdown);countdown=0;tone(900,.3);lastSecond=null;state.deadline=Date.now()+state.remaining;state.screen='playing';save();render()}},1000)}
 $('#sound').onclick=()=>{if(!state)state={version:1,screen:'home',sound:true};state.sound=!state.sound;save();$('#sound').textContent=state.sound?'Sound on':'Sound off';if(state.sound)tone()};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state?.screen==='playing')tick()});
